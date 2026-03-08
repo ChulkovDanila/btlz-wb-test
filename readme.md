@@ -1,54 +1,63 @@
-# Шаблон для выполнения тестового задания
+# WB Tariffs Service
 
-## Описание
-Шаблон подготовлен для того, чтобы попробовать сократить трудоемкость выполнения тестового задания.
+Сервис делает две вещи:
+- раз в час забирает тарифы коробов WB и сохраняет их в PostgreSQL;
+- раз в час обновляет данные в Google Sheets (`stocks_coefs`) для всех `spreadsheet_id` из БД.
 
-В шаблоне настоены контейнеры для `postgres` и приложения на `nodejs`.  
-Для взаимодействия с БД используется `knex.js`.  
-В контейнере `app` используется `build` для приложения на `ts`, но можно использовать и `js`.
+## Стек
+- Node.js 20 + TypeScript
+- PostgreSQL + knex
+- Docker Compose
+- Google Sheets API
 
-Шаблон не является обязательным!\
-Можно использовать как есть или изменять на свой вкус.
-
-Все настройки можно найти в файлах:
-- compose.yaml
-- dockerfile
-- package.json
-- tsconfig.json
-- src/config/env/env.ts
-- src/config/knex/knexfile.ts
-
-## Команды:
-
-Запуск базы данных:
-```bash
-docker compose up -d --build postgres
-```
-
-Для выполнения миграций и сидов не из контейнера:
-```bash
-npm run knex:dev migrate latest
-```
+## Быстрый старт
+1. Скопировать `example.env` в `.env`.
+2. Заполнить обязательные переменные:
+   - `WB_API_TOKEN`
+   - `GOOGLE_SERVICE_ACCOUNT_PROJECT_ID`
+   - `GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL`
+   - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`
+   - `GOOGLE_SPREADSHEET_IDS`
+3. Запустить:
 
 ```bash
-npm run knex:dev seed run
-```
-Также можно использовать и остальные команды (`migrate make <name>`,`migrate up`, `migrate down` и т.д.)
-
-Для запуска приложения в режиме разработки:
-```bash
-npm run dev
-```
-
-Запуск проверки самого приложения:
-```bash
-docker compose up -d --build app
-```
-
-Для финальной проверки рекомендую:
-```bash
-docker compose down --rmi local --volumes
 docker compose up --build
 ```
 
-PS: С наилучшими пожеланиями!
+## Google Sheets (кратко)
+1. Создать таблицу и лист `stocks_coefs`.
+2. Выдать доступ `Editor` для `GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL`.
+3. Взять `spreadsheet_id` из URL таблицы и добавить в `GOOGLE_SPREADSHEET_IDS`.
+4. Убедиться, что `GOOGLE_SERVICE_ACCOUNT_*` заполнены в `.env`.
+
+## Что делает приложение при старте
+- применяет миграции;
+- запускает seed;
+- стартует worker;
+- поднимает `GET /health` на `:5000`.
+
+## Как проверить, что все работает
+1. Health:
+
+```bash
+curl http://localhost:5000/health
+```
+
+Ожидаемый ответ: `{"status":"ok"}`.
+
+2. В логах контейнера `app` должны быть успешные шаги:
+- `[wb-ingest] done: upserted=...`
+- `[sheets-sync] done: spreadsheets=... rows=...`
+
+3. В БД должна заполняться таблица `wb_box_tariffs_daily`, а в Google Sheet (лист `stocks_coefs`) должны обновляться строки.
+
+## Бизнес-правила
+- `tariff_date` хранится как дата дня.
+- Повторный hourly запуск в тот же день обновляет записи, а не создает дубли (`daily upsert`).
+- Перед выгрузкой в Google Sheets данные сортируются по возрастанию коэффициента.
+
+## Переменные окружения (минимум)
+- БД (по ТЗ): `POSTGRES_DB=postgres`, `POSTGRES_USER=postgres`, `POSTGRES_PASSWORD=postgres`.
+- `WB_API_TOKEN` — токен WB API.
+- `GOOGLE_SERVICE_ACCOUNT_*` — доступ к Google Sheets через service account.
+- `GOOGLE_SPREADSHEET_IDS` — список таблиц через запятую.

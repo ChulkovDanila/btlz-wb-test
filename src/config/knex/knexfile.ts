@@ -10,7 +10,7 @@ const connectionSchema = z.object({
     password: z.string(),
 });
 
-const NODE_ENV = env.NODE_ENV ?? "development";
+const NODE_ENV = env.NODE_ENV === "production" ? "production" : "development";
 
 const knegConfigs: Record<typeof NODE_ENV, Knex.Config> = {
     development: {
@@ -31,7 +31,7 @@ const knegConfigs: Record<typeof NODE_ENV, Knex.Config> = {
             stub: 'src/config/knex/migration.stub.js',
             directory: "./src/postgres/migrations",
             tableName: "migrations",
-            extension: "ts",
+            extension: "js",
         },
         seeds: {
             stub: 'src/config/knex/seed.stub.js',
@@ -60,7 +60,7 @@ const knegConfigs: Record<typeof NODE_ENV, Knex.Config> = {
             extension: "js",
         },
         seeds: {
-            stub: 'src/config/knex/seed.stub.js',
+            stub: 'dist/config/knex/seed.stub.js',
             directory: "./dist/postgres/seeds",
             extension: "js",
         },
